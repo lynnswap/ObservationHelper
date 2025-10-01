@@ -50,7 +50,7 @@ public struct ObservationScheduler {
 
 public extension ObservationScheduler {
     @MainActor
-    public final class Handle {
+    final class Handle {
         private let track: TrackingBlock
         private var onChange: ChangeHandler?
         private let delay: ContinuousClock.Duration?
