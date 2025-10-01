@@ -16,7 +16,7 @@ public final class ObservationScheduler {
 
     private init(
         debounce delay: ContinuousClock.Duration? = nil,
-        initialFire: Bool = false,
+        initial: Bool = false,
         track: @escaping TrackingBlock,
         onChange: @escaping ChangeHandler
     ) {
@@ -24,7 +24,7 @@ public final class ObservationScheduler {
         self.onChange = onChange
         self.delay = delay
 
-        observe(initialFire: initialFire)
+        observe(initial: initial)
     }
 
     public func cancel() {
@@ -34,7 +34,7 @@ public final class ObservationScheduler {
         onChange = nil
     }
 
-    private func observe(initialFire: Bool) {
+    private func observe(initial: Bool) {
         guard !isCancelled else { return }
 
         withObservationTracking {
@@ -44,11 +44,11 @@ public final class ObservationScheduler {
             Task { @MainActor [weak self] in
                 guard let self, !self.isCancelled else { return }
                 self.scheduleChange()
-                self.observe(initialFire: false)
+                self.observe(initial: false)
             }
         }
 
-        if initialFire {
+        if initial {
             fireNow()
         }
     }
@@ -82,7 +82,7 @@ extension ObservationScheduler {
     public struct Builder {
         fileprivate let track: TrackingBlock
         fileprivate var delay: ContinuousClock.Duration?
-        fileprivate var initialFire = false
+        fileprivate var initial = false
 
         fileprivate init(track: @escaping TrackingBlock) {
             self.track = track
@@ -94,22 +94,22 @@ extension ObservationScheduler {
             return copy
         }
 
-        public func initialFire(_ shouldFire: Bool = true) -> Builder {
+        public func initial(_ shouldFire: Bool = true) -> Builder {
             var copy = self
-            copy.initialFire = shouldFire
+            copy.initial = shouldFire
             return copy
         }
 
-        public func onChange(initialFire: Bool, _ handler: @escaping ChangeHandler) -> ObservationScheduler {
+        public func onChange(initial: Bool, _ handler: @escaping ChangeHandler) -> ObservationScheduler {
             var copy = self
-            copy.initialFire = initialFire
+            copy.initial = initial
             return copy.onChange(handler)
         }
 
         public func onChange(_ handler: @escaping ChangeHandler) -> ObservationScheduler {
             ObservationScheduler(
                 debounce: delay,
-                initialFire: initialFire,
+                initial: initial,
                 track: track,
                 onChange: handler
             )
@@ -127,12 +127,12 @@ extension ObservationScheduler {
         target: Target,
         keyPath: KeyPath<Target, Value>,
         debounce delay: ContinuousClock.Duration? = nil,
-        initialFire: Bool = false,
+        initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
     ) {
         self.init(
             debounce: delay,
-            initialFire: initialFire,
+            initial: initial,
             track: { [weak target] in
                 guard let target else { return }
                 _ = target[keyPath: keyPath]
@@ -147,14 +147,14 @@ public extension Observable where Self: AnyObject {
     func observeDebounced<Value>(
         _ keyPath: KeyPath<Self, Value>,
         debounce delay: ContinuousClock.Duration? = nil,
-        initialFire: Bool = false,
+        initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
     ) -> ObservationScheduler {
         ObservationScheduler(
             target: self,
             keyPath: keyPath,
             debounce: delay,
-            initialFire: initialFire,
+            initial: initial,
             onChange: onChange
         )
     }
@@ -162,13 +162,13 @@ public extension Observable where Self: AnyObject {
     func callAsFunction<Value>(
         _ keyPath: KeyPath<Self, Value>,
         debounce delay: ContinuousClock.Duration? = nil,
-        initialFire: Bool = false,
+        initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
     ) -> ObservationScheduler {
         observeDebounced(
             keyPath,
             debounce: delay,
-            initialFire: initialFire,
+            initial: initial,
             onChange: onChange
         )
     }
