@@ -23,7 +23,7 @@ final class SettingsViewModel {
     @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
 
     func bindSettings() {
-        ObservationScheduler.observe { [weak self] in
+        ObservationScheduler { [weak self] in
             guard let self else { return }
             _ = self.settings.isEnabled
         }
@@ -81,7 +81,7 @@ final class SettingsViewModel {
     @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
 
     func bindSettings() {
-        ObservationScheduler.observe { [weak self] in
+        ObservationScheduler { [weak self] in
             guard let self else { return }
             _ = self.settings.isEnabled
         }
