@@ -3,48 +3,101 @@ import Observation
 
 /// Wraps `withObservationTracking` to observe one or more values and trigger
 /// change handlers with optional debouncing.
-@MainActor
 public struct ObservationScheduler {
     public typealias TrackingBlock = () -> Void
     public typealias ChangeHandler = () -> Void
 
-    private let track: TrackingBlock
-    private var delay: ContinuousClock.Duration?
-    private var initial = false
+    private struct Configuration {
+        var track: TrackingBlock
+        var delay: ContinuousClock.Duration?
+        var initial = false
+    }
 
+    private let configuration: Configuration?
+    private let handle: Handle?
+
+    @MainActor
     public init(_ track: @escaping TrackingBlock) {
-        self.track = track
+        self.configuration = Configuration(track: track)
+        self.handle = nil
     }
 
+    private init(configuration: Configuration?, handle: Handle?) {
+        self.configuration = configuration
+        self.handle = handle
+    }
+
+    @MainActor
     public func debounce(_ delay: ContinuousClock.Duration?) -> ObservationScheduler {
-        var copy = self
-        copy.delay = delay
-        return copy
+        guard handle == nil, let configuration else { return self }
+        var config = configuration
+        config.delay = delay
+        return ObservationScheduler(configuration: config, handle: nil)
     }
 
+    @MainActor
     public func initial(_ shouldFire: Bool = true) -> ObservationScheduler {
-        var copy = self
-        copy.initial = shouldFire
-        return copy
+        guard handle == nil, let configuration else { return self }
+        var config = configuration
+        config.initial = shouldFire
+        return ObservationScheduler(configuration: config, handle: nil)
     }
 
-    public func onChange(initial: Bool, _ handler: @escaping ChangeHandler) -> ObservationScheduler.Handle {
-        var copy = self
-        copy.initial = initial
-        return copy.onChange(handler)
+    @MainActor
+    public func onChange(initial: Bool, _ handler: @escaping ChangeHandler) -> ObservationScheduler {
+        guard handle == nil, let configuration else { return self }
+        var config = configuration
+        config.initial = initial
+        return ObservationScheduler(configuration: config, handle: nil).onChange(handler)
     }
 
-    public func onChange(_ handler: @escaping ChangeHandler) -> ObservationScheduler.Handle {
-        ObservationScheduler.Handle(
-            debounce: delay,
-            initial: initial,
-            track: track,
+    @MainActor
+    public func onChange(_ handler: @escaping ChangeHandler) -> ObservationScheduler {
+        guard handle == nil, let configuration else { return self }
+        let runningHandle = Handle(
+            debounce: configuration.delay,
+            initial: configuration.initial,
+            track: configuration.track,
             onChange: handler
         )
+        return ObservationScheduler(configuration: nil, handle: runningHandle)
     }
 
+    @MainActor
+    public func cancel() {
+        handle?.cancel()
+    }
+
+    @MainActor
+    public func store(in storage: inout Set<ObservationScheduler>) {
+        guard handle != nil else { return }
+        storage.insert(self)
+    }
+
+    @MainActor
     public static func observe(_ track: @escaping TrackingBlock) -> ObservationScheduler {
         ObservationScheduler(track)
+    }
+}
+
+extension ObservationScheduler: Hashable {
+    public static func == (lhs: ObservationScheduler, rhs: ObservationScheduler) -> Bool {
+        switch (lhs.handle, rhs.handle) {
+        case let (.some(left), .some(right)):
+            return left === right
+        case (.none, .none):
+            return false
+        default:
+            return false
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        guard let handle else {
+            hasher.combine(0)
+            return
+        }
+        hasher.combine(ObjectIdentifier(handle))
     }
 }
 
@@ -70,7 +123,7 @@ public extension ObservationScheduler {
             observe(initial: initial)
         }
 
-        public func cancel() {
+        func cancel() {
             isCancelled = true
             pendingTask?.cancel()
             pendingTask = nil
@@ -119,41 +172,20 @@ public extension ObservationScheduler {
 }
 
 @MainActor
-public extension ObservationScheduler.Handle {
-    convenience init<Target: AnyObject & Observable, Value>(
-        target: Target,
-        keyPath: KeyPath<Target, Value>,
-        debounce delay: ContinuousClock.Duration? = nil,
-        initial: Bool = false,
-        onChange: @escaping ObservationScheduler.ChangeHandler
-    ) {
-        self.init(
-            debounce: delay,
-            initial: initial,
-            track: { [weak target] in
-                guard let target else { return }
-                _ = target[keyPath: keyPath]
-            },
-            onChange: onChange
-        )
-    }
-}
-
-@MainActor
 public extension Observable where Self: AnyObject {
     func observeDebounced<Value>(
         _ keyPath: KeyPath<Self, Value>,
         debounce delay: ContinuousClock.Duration? = nil,
         initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
-    ) -> ObservationScheduler.Handle {
-        ObservationScheduler.Handle(
-            target: self,
-            keyPath: keyPath,
-            debounce: delay,
-            initial: initial,
-            onChange: onChange
-        )
+    ) -> ObservationScheduler {
+        ObservationScheduler { [weak self] in
+            guard let self else { return }
+            _ = self[keyPath: keyPath]
+        }
+        .debounce(delay)
+        .initial(initial)
+        .onChange(onChange)
     }
 
     func callAsFunction<Value>(
@@ -161,28 +193,12 @@ public extension Observable where Self: AnyObject {
         debounce delay: ContinuousClock.Duration? = nil,
         initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
-    ) -> ObservationScheduler.Handle {
+    ) -> ObservationScheduler {
         observeDebounced(
             keyPath,
             debounce: delay,
             initial: initial,
             onChange: onChange
         )
-    }
-}
-
-extension ObservationScheduler.Handle: Hashable {
-    public nonisolated static func == (lhs: ObservationScheduler.Handle, rhs: ObservationScheduler.Handle) -> Bool {
-        lhs === rhs
-    }
-
-    public nonisolated func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self))
-    }
-}
-
-public extension ObservationScheduler.Handle {
-    func store(in storage: inout Set<ObservationScheduler.Handle>) {
-        storage.insert(self)
     }
 }
