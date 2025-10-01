@@ -17,19 +17,31 @@ ObservationHelper wraps Apple's Observation framework so you can register change
 import Observation
 import ObservationHelper
 
-@ObservationIgnored private var schedulers = Set<ObservationScheduler>()
+@Observable
+final class SettingsViewModel {
+    var settings: Settings
+    @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
 
-func bindSettings() {
-    ObservationScheduler.observe { [weak self] in
-        guard let self else { return }
-        _ = self.settings.isEnabled
+    init(settings: Settings) {
+        self.settings = settings
     }
-    .debounce(.milliseconds(150))
-    .initial(true)
-    .onChange { [weak self] in
-        self?.reloadInterface()
+
+    func bindSettings() {
+        ObservationScheduler.observe { [weak self] in
+            guard let self else { return }
+            _ = self.settings.isEnabled
+        }
+        .debounce(.milliseconds(150))
+        .initial(true)
+        .onChange { [weak self] in
+            self?.reloadInterface()
+        }
+        .store(in: &schedulers)
     }
-    .store(in: &schedulers)
+
+    private func reloadInterface() {
+        // Update UI...
+    }
 }
 ```
 
@@ -40,8 +52,14 @@ Setting up observation manually quickly turns into a mix of `withObservationTrac
 ### Before (hand-rolled observation)
 
 ```swift
-final class TimelineViewModel: Observable {
+@Observable
+final class SettingsViewModel {
+    var settings: Settings
     private var debounceTask: Task<Void, Never>?
+
+    init(settings: Settings) {
+        self.settings = settings
+    }
 
     func bindSettings() {
         withObservationTracking {
@@ -66,8 +84,14 @@ final class TimelineViewModel: Observable {
 ### After (ObservationScheduler)
 
 ```swift
-final class TimelineViewModel: Observable {
+@Observable
+final class SettingsViewModel {
+    var settings: Settings
     @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
+
+    init(settings: Settings) {
+        self.settings = settings
+    }
 
     func bindSettings() {
         ObservationScheduler.observe { [weak self] in
@@ -104,4 +128,3 @@ translationProcessor.observeDebounced(\.isTranslateTweet, debounce: .seconds(0.1
 ## License
 
 ObservationHelper is available under the terms of the MIT License. See the `LICENSE` file for details.
-
