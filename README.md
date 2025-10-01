@@ -22,17 +22,12 @@ final class SettingsViewModel {
     var settings: Settings
     @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
 
-    init(settings: Settings) {
-        self.settings = settings
-    }
-
     func bindSettings() {
         ObservationScheduler.observe { [weak self] in
             guard let self else { return }
             _ = self.settings.isEnabled
         }
         .debounce(.milliseconds(150))
-        .initial(true)
         .onChange { [weak self] in
             self?.reloadInterface()
         }
@@ -56,10 +51,6 @@ Setting up observation manually quickly turns into a mix of `withObservationTrac
 final class SettingsViewModel {
     var settings: Settings
     private var debounceTask: Task<Void, Never>?
-
-    init(settings: Settings) {
-        self.settings = settings
-    }
 
     func bindSettings() {
         withObservationTracking {
@@ -89,10 +80,6 @@ final class SettingsViewModel {
     var settings: Settings
     @ObservationIgnored private var schedulers = Set<ObservationScheduler>()
 
-    init(settings: Settings) {
-        self.settings = settings
-    }
-
     func bindSettings() {
         ObservationScheduler.observe { [weak self] in
             guard let self else { return }
@@ -112,18 +99,6 @@ final class SettingsViewModel {
 ```
 
 The fluent API makes it clear what is being observed, how it is throttled, and what happens when the value changes—without any manual cancellation or explicit re-registration.
-
-## Convenience Extensions
-
-`Observable` types gain a `observeDebounced` helper (and a `callAsFunction` wrapper) that reads even shorter when you only need a single key path:
-
-```swift
-translationProcessor.observeDebounced(\.isTranslateTweet, debounce: .seconds(0.1)) { [weak self] in
-    guard let self else { return }
-    self.updateLiveTranslationToggle()
-}
-.store(in: &observationSchedulers)
-```
 
 ## License
 
