@@ -173,7 +173,7 @@ public extension ObservationScheduler {
 
 @MainActor
 public extension Observable where Self: AnyObject {
-    func observeDebounced<Value>(
+    func observe<Value>(
         _ keyPath: KeyPath<Self, Value>,
         debounce delay: ContinuousClock.Duration? = nil,
         initial: Bool = false,
@@ -194,7 +194,7 @@ public extension Observable where Self: AnyObject {
         initial: Bool = false,
         onChange: @escaping ObservationScheduler.ChangeHandler
     ) -> ObservationScheduler {
-        observeDebounced(
+        observe(
             keyPath,
             debounce: delay,
             initial: initial,
