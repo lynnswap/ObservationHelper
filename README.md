@@ -20,7 +20,7 @@ settings.observe(\.isEnabled) { [weak self] in
     guard let self else { return }
     // Update UI...
 }
-.store(in: &observationSchedulers)
+.store(in: &schedulers)
 ```
 
 And drop down to the fluent scheduler when you need finer control:
