@@ -13,6 +13,18 @@ ObservationHelper wraps Apple's Observation framework so you can register change
 
 ## Quick Start
 
+Start with the key-path convenience when you just need to react to a value:
+
+```swift
+settings.observe(\.isEnabled) { [weak self] in
+    guard let self else { return }
+    // Update UI...
+}
+.store(in: &observationSchedulers)
+```
+
+And drop down to the fluent scheduler when you need finer control:
+
 ```swift
 import Observation
 import ObservationHelper
